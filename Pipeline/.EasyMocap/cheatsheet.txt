@@ -1,0 +1,20 @@
+python setup.py develop --user
+
+%cd /content/drive/MyDrive/colab_data
+
+# !git clone https://github.com/zju3dv/EasyMocap.git
+! pip install ipython~=7.9.0
+! pip install -r ./EasyMocap/requirements.txt > output.txt
+! pip install chumpy > output.txt
+! pip install pyrender
+
+# ! python3 apps/preprocess/extract_keypoints.py $data --mode mp-holistic
+python apps/preprocess/extract_keypoints.py JD --mode yolo-hrnet
+
+source ~/.bashrc
+defaults write com.apple.desktopservices DSDontWriteStores true
+find ./ -name ".DS_Store" -delete
+
+python apps/demo/mocap.py JD --work internet --fps 30
+
+python scripts/postprocess/convert2bvh.py -- '/Users/Marvin/NII_Code/EasyMocap/JD/output-smpl-3d/smpl/Lev' --out ./out/

@@ -1,0 +1,61 @@
+Collecting ipdb
+  Using cached ipdb-0.13.13-py3-none-any.whl (12 kB)
+Collecting joblib
+  Using cached joblib-1.2.0-py3-none-any.whl (297 kB)
+Requirement already satisfied: tqdm in /home/yiyu/miniconda3/lib/python3.8/site-packages (from -r requirements.txt (line 3)) (4.65.0)
+Collecting opencv-python
+  Using cached opencv_python-4.7.0.72-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (61.8 MB)
+Collecting yacs
+  Using cached yacs-0.1.8-py3-none-any.whl (14 kB)
+Collecting tabulate
+  Using cached tabulate-0.9.0-py3-none-any.whl (35 kB)
+Collecting termcolor
+  Using cached termcolor-2.2.0-py3-none-any.whl (6.6 kB)
+Collecting chumpy
+  Using cached chumpy-0.70.tar.gz (50 kB)
+  Preparing metadata (setup.py): started
+  Preparing metadata (setup.py): finished with status 'done'
+Collecting func_timeout
+  Using cached func_timeout-4.3.5.tar.gz (44 kB)
+  Preparing metadata (setup.py): started
+  Preparing metadata (setup.py): finished with status 'done'
+Requirement already satisfied: ipython>=7.31.1 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipdb->-r requirements.txt (line 1)) (8.12.0)
+Requirement already satisfied: decorator in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipdb->-r requirements.txt (line 1)) (5.1.1)
+Collecting tomli
+  Using cached tomli-2.0.1-py3-none-any.whl (12 kB)
+Requirement already satisfied: numpy>=1.17.0 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from opencv-python->-r requirements.txt (line 4)) (1.24.2)
+Collecting PyYAML
+  Downloading PyYAML-6.0-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl (701 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 701.2/701.2 kB 10.1 MB/s eta 0:00:00
+Collecting scipy>=0.13.0
+  Downloading scipy-1.10.1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (34.5 MB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 34.5/34.5 MB 10.3 MB/s eta 0:00:00
+Requirement already satisfied: six>=1.11.0 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from chumpy->-r requirements.txt (line 8)) (1.16.0)
+Requirement already satisfied: backcall in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (0.2.0)
+Requirement already satisfied: prompt-toolkit!=3.0.37,<3.1.0,>=3.0.30 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (3.0.38)
+Requirement already satisfied: typing-extensions in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (4.5.0)
+Requirement already satisfied: pexpect>4.3 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (4.8.0)
+Requirement already satisfied: traitlets>=5 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (5.9.0)
+Requirement already satisfied: matplotlib-inline in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (0.1.6)
+Requirement already satisfied: pickleshare in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (0.7.5)
+Requirement already satisfied: jedi>=0.16 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (0.18.2)
+Requirement already satisfied: stack-data in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (0.6.2)
+Requirement already satisfied: pygments>=2.4.0 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (2.15.0)
+Requirement already satisfied: parso<0.9.0,>=0.8.0 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from jedi>=0.16->ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (0.8.3)
+Requirement already satisfied: ptyprocess>=0.5 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from pexpect>4.3->ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (0.7.0)
+Requirement already satisfied: wcwidth in /home/yiyu/miniconda3/lib/python3.8/site-packages (from prompt-toolkit!=3.0.37,<3.1.0,>=3.0.30->ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (0.2.6)
+Requirement already satisfied: executing>=1.2.0 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from stack-data->ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (1.2.0)
+Requirement already satisfied: asttokens>=2.1.0 in /home/yiyu/miniconda3/lib/python3.8/site-packages (from stack-data->ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (2.2.1)
+Requirement already satisfied: pure-eval in /home/yiyu/miniconda3/lib/python3.8/site-packages (from stack-data->ipython>=7.31.1->ipdb->-r requirements.txt (line 1)) (0.2.2)
+Building wheels for collected packages: chumpy, func_timeout
+  Building wheel for chumpy (setup.py): started
+  Building wheel for chumpy (setup.py): finished with status 'done'
+  Created wheel for chumpy: filename=chumpy-0.70-py3-none-any.whl size=58268 sha256=6710015420e3aef5042302007b32bf704bc0785a1a2b1c017a88a74ef4518e44
+  Stored in directory: /home/yiyu/.cache/pip/wheels/d9/a2/b8/b8aeeeaeb01b5002085156add1aed832f2fb03e79d0f22dfed
+  Building wheel for func_timeout (setup.py): started
+  Building wheel for func_timeout (setup.py): finished with status 'done'
+  Created wheel for func_timeout: filename=func_timeout-4.3.5-py3-none-any.whl size=15081 sha256=826bed14ab60799af725d83b589e8b2e83cdce5537fd99a56e34dbc58a4fef45
+  Stored in directory: /home/yiyu/.cache/pip/wheels/a8/92/ca/5bbab358275e310af23b73fc32ebf37d6a7a08c87c8d2cdbc1
+Successfully built chumpy func_timeout
+Installing collected packages: func_timeout, tomli, termcolor, tabulate, scipy, PyYAML, opencv-python, joblib, yacs, chumpy, ipdb
+Successfully installed PyYAML-6.0 chumpy-0.70 func_timeout-4.3.5 ipdb-0.13.13 joblib-1.2.0 opencv-python-4.7.0.72 scipy-1.10.1 tabulate-0.9.0 termcolor-2.2.0 tomli-2.0.1 yacs-0.1.8

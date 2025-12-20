@@ -1,0 +1,44 @@
+ablation: None
+activation: gelu
+archiname: transformer
+batch_size: 4
+cuda: 'True'
+dataset: lm2d
+debug: 'False'
+expname: exps
+folder: exps/lm2d20251212-174355
+glob: 'True'
+glob_rot:
+- 3.141592653589793
+- 0
+- 0
+jointstype: vertices
+lambda_kl: 1.0e-05
+lambda_rc: 1.0
+lambda_rcxyz: 1.0
+lambdas:
+  kl: 1.0e-05
+  rc: 1.0
+latent_dim: 512
+losses:
+- rc
+- kl
+lr: 0.0001
+max_len: -1
+min_len: -1
+modelname: cvae_transformer_rc_kl
+modeltype: cvae
+nfeats: 3
+njoints: 26
+no-vertstrans: 'False'
+num_classes: 256
+num_epochs: 10
+num_frames: 180
+num_layers: 4
+num_seq_max: -1
+pose_rep: rot6d
+sampling: conseq
+sampling_step: 1
+snapshot: 5
+translation: 'True'
+vertstrans: 'False'
