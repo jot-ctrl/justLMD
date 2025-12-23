@@ -159,8 +159,6 @@ class CVAEDecoder(nn.Module):
         
         # Audio 出力
         audio_out = self.audio_out(decoded)  # (B, T, audio_dim)
-        audio_out = audio_out.view(B * T, -1)  # (B*T, audio_dim)
-        
         return audio_out
 
 
@@ -173,6 +171,7 @@ class TransCVAE(nn.Module):
                  d_model: int = 256, nhead: int = 4, num_layers: int = 2,
                  dim_feedforward: int = 512, latent_dim: int = 128, seq_len: int = 180):
         super().__init__()
+        self.latent_dim = latent_dim
         self.encoder = CVAEEncoder(audio_dim, motion_dim, lyrics_dim, d_model, nhead, num_layers, dim_feedforward, latent_dim)
         self.decoder = CVAEDecoder(audio_dim, motion_dim, lyrics_dim, d_model, nhead, num_layers, dim_feedforward, latent_dim, seq_len)
 

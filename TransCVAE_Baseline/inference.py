@@ -51,47 +51,25 @@ def _as_bt_mel(x: torch.Tensor, seq_len: int, n_mels: int = 128) -> torch.Tensor
 
 def mel_to_audio(mel_db: torch.Tensor, target_sr: int = 18000):
     """
-    mel_db: (T, n_mels_model) を想定（今は n_mels_model=128）
-    vocoder側の n_mels に合わせて周波数軸をリサンプルしてから decode する
+    あなたの data_loader.py の mel 定義（SR=18000, hop_length=601, n_mels=128）に合わせて復元する。
+    まずは vocoder 不整合を排除して「モデルが意味のある mel を出しているか」を確実に切り分ける。
     """
     if mel_db.dim() != 2:
         raise RuntimeError(f"mel_to_audio expects (T, n_mels), got {tuple(mel_db.shape)}")
 
-    vocoder = load_vocoder()
+    mel_np = mel_db.detach().cpu().numpy().T  # (n_mels, T)
+    mel_power = librosa.db_to_power(mel_np)
 
-    # vocoder が期待する mel bin 数を取得（Vocos は backbone.embed が Conv1d）
-    try:
-        expected_mels = int(vocoder.backbone.embed.in_channels)
-    except Exception:
-        expected_mels = 100  # fallback
-
-    # (T, M) -> (1, M, T)
-    mel_np = mel_db.detach().cpu().numpy()
-    mel_power = librosa.db_to_power(mel_np)  # ※モデル出力が dB 前提。後述参照
-    mel_tensor = torch.from_numpy(mel_power).float().transpose(0, 1).unsqueeze(0)  # (1, M, T)
-
-    # 128 -> 100 など、mel bin が違う場合は周波数軸を補間
-    if mel_tensor.size(1) != expected_mels:
-        # (B, M, T) -> (B, 1, M, T) として 2D 補間
-        mel_tensor_2d = mel_tensor.unsqueeze(1)  # (1, 1, M, T)
-        mel_tensor_2d = F.interpolate(
-            mel_tensor_2d,
-            size=(expected_mels, mel_tensor.size(-1)),
-            mode="bilinear",
-            align_corners=False,
-        )
-        mel_tensor = mel_tensor_2d.squeeze(1)  # (1, expected_mels, T)
-
-    mel_tensor = mel_tensor.to(next(vocoder.parameters()).device)
-
-    with torch.no_grad():
-        audio_24k = vocoder.decode(mel_tensor)  # (1, samples) @24kHz
-
-    if target_sr != 24000:
-        audio_18k = torchaudio.functional.resample(audio_24k, orig_freq=24000, new_freq=target_sr)
-        return audio_18k
-    return audio_24k
-
+    # librosa の逆メル。n_fft は melspectrogram のデフォルト(2048)に合わせる
+    y = librosa.feature.inverse.mel_to_audio(
+        mel_power,
+        sr=target_sr,
+        n_fft=2048,
+        hop_length=601,
+        power=2.0,
+    )
+    # torch tensor で返す（既存の save 処理と合わせる）
+    return torch.from_numpy(y).unsqueeze(0).float()
 
 def _ensure_batched(x: torch.Tensor) -> torch.Tensor:
     # (T, D) -> (1, T, D)
@@ -99,6 +77,14 @@ def _ensure_batched(x: torch.Tensor) -> torch.Tensor:
         return x.unsqueeze(0)
     return x
 
+def reconstruct_mel(model, audio, motion, lyrics, device):
+    model.eval()
+    audio  = _ensure_batched(audio).to(device)
+    motion = _ensure_batched(motion).to(device)
+    lyrics = _ensure_batched(lyrics).to(device)
+    with torch.no_grad():
+        recon, mu, logvar = model(audio, motion, lyrics)
+    return recon.squeeze(0).cpu()  # (T, 128)
 
 def generate_mel_sample(model, motion, lyrics, device):
     """
@@ -163,17 +149,6 @@ def _print_mel_stats(name, x):
     print(f"[{name}] shape={tuple(x.shape)} min={x.min().item():.3f} max={x.max().item():.3f} mean={x.mean().item():.3f} std={x.std().item():.3f}")
 
 
-def denorm_like_gt(mel_norm: torch.Tensor, gt_norm: torch.Tensor) -> torch.Tensor:
-    """
-    mel_norm: (T, M) 生成物（正規化空間）
-    gt_norm : (T, M) 入力バッチのGT特徴（同じ正規化のされ方をしている前提）
-    生成物を「GTと同じ平均・分散」に戻して dB 近似にする
-    """
-    mu = gt_norm.mean()
-    sig = gt_norm.std().clamp_min(1e-6)
-    return mel_norm * sig + mu
-
-
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -213,33 +188,44 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     for idx, batch in enumerate(loader):
+        audio_gt = batch["audio"]
         motion = batch["motion"]
         lyrics = batch["lyrics"]
         song_name = batch["song"][0] if isinstance(batch["song"], (list, tuple)) else str(batch["song"])
         timestamp = batch["timestamp"][0] if isinstance(batch["timestamp"], (list, tuple)) else str(batch["timestamp"])
 
-        # decoder-only sampling
-        generated = generate_mel_sample(model, motion, lyrics, device)  # 形が (B*T, 128) の可能性あり
-
-        mel_bt = _as_bt_mel(generated.detach().cpu(), seq_len=CONFIG["seq_len"], n_mels=128)  # (B, T, 128)
-        mel_db = mel_bt[0]  # (T, 128) ← ここが重要（[0]は最後に）
+        # ★再構成（encoder→decoder）
+        recon_bt = reconstruct_mel(model, audio_gt, motion, lyrics, device)  # (T,128)想定 or (B,T,128) の可能性
+        recon_bt = _as_bt_mel(recon_bt, seq_len=CONFIG["seq_len"], n_mels=128)  # (B,T,128)に揃える
+        mel_db = recon_bt[0]  # (T,128)
 
         # 生成物を GT と同じスケールに戻す（dB 近似）
-        audio = mel_to_audio(denorm_like_gt(mel_db, batch["audio"][0].cpu()), target_sr=CONFIG.get("sr", 18000))
+        audio = mel_to_audio(mel_db, target_sr=CONFIG.get("sr", 18000))
         audio_np = audio.squeeze(0).detach().cpu().numpy()
 
-        out_path = os.path.join(output_dir, f"{song_name}_{timestamp}.wav")
+        out_path = os.path.join(output_dir, f"{song_name}_{timestamp}_RECON.wav")
         sf.write(out_path, audio_np, CONFIG.get("sr", 18000))
         print(f"✓ Generated: {out_path}")
 
         # デバッグ用: 生成したメルスペクトログラムの統計情報を表示
-        _print_mel_stats("generated_mel_db(?)", mel_db)
+        _print_mel_stats("recon_mel_db(?)", mel_db)
+        _print_mel_stats("gt_audio_feat", _as_bt_mel(audio_gt.detach().cpu(), seq_len=CONFIG["seq_len"], n_mels=128)[0])
 
         # バッチに GT mel があるなら:
         # _print_mel_stats("gt_audio_feat", batch["audio"][0].cpu())
+        
+        # --- 追加: GT mel を同じ逆変換で wav化して、逆変換の妥当性を確認 ---
+        gt_bt = _as_bt_mel(audio_gt.detach().cpu(), seq_len=CONFIG["seq_len"], n_mels=128)
+        gt_mel = gt_bt[0]  # (T, 128)
 
-        if idx >= 4:
-            break
+        gt_audio = mel_to_audio(gt_mel, target_sr=CONFIG.get("sr", 18000))
+        gt_audio_np = gt_audio.squeeze(0).detach().cpu().numpy()
+
+        gt_out_path = os.path.join(output_dir, f"{song_name}_{timestamp}_GTINV.wav")
+        sf.write(gt_out_path, gt_audio_np, CONFIG.get("sr", 18000))
+        print(f"✓ Wrote GT inversion: {gt_out_path}")
+
+        break
 
     print(f"\n✓ Generation complete! Check {output_dir}/ for results.")
 

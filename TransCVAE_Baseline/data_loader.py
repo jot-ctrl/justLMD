@@ -47,10 +47,7 @@ class SongsTestDataset(Dataset):
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.bert_model = BertModel.from_pretrained('bert-base-uncased')
         self.bert_model.eval()
-        
-        # Lyrics embedding projection
-        self.lyrics_projection = nn.Linear(768, 128)
-        
+
         self.data = []
         self._load_data()
     
@@ -180,9 +177,8 @@ class SongsTestDataset(Dataset):
             # Mel-spectrogram 抽出
             mel_spec = librosa.feature.melspectrogram(y=audio, sr=SR, hop_length=601, n_mels=128)
             mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
-            mel_spec_db_norm = (mel_spec_db - np.mean(mel_spec_db)) / (np.std(mel_spec_db) + 1e-8)
             
-            audio_features = torch.from_numpy(mel_spec_db_norm.T).float()
+            audio_features = torch.from_numpy(mel_spec_db.T).float()
             return audio_features
         except Exception as e:
             print(f"Error loading audio: {e}")
@@ -195,21 +191,21 @@ class SongsTestDataset(Dataset):
                 tokens = self.tokenizer.encode_plus(
                     lyrics_text,
                     add_special_tokens=True,
-                    return_tensors='pt'
+                    return_tensors='pt',
+                    max_length=512,
+                    truncation=True,
+                    padding=True,
                 )
                 outputs = self.bert_model(**tokens)
                 # 最後のレイヤーの出力を使用
                 lyrics_embeddings = outputs.last_hidden_state[0].detach()  # (seq_len, 768)
                 
-                # フレーム数に合わせて linear projection
-                proj = nn.Linear(lyrics_embeddings.size(0), SEQUENCE_LENGTH * FPS).to(lyrics_embeddings.device)
-                lyrics_embeddings = lyrics_embeddings.permute(1, 0)  # (768, seq_len)
-                lyrics_embeddings = proj(lyrics_embeddings)  # (768, 180)
-                lyrics_embeddings = lyrics_embeddings.permute(1, 0)  # (180, 768)
-                
-                # 128 次元に削減
-                lyrics_embeddings = self.lyrics_projection(lyrics_embeddings).detach()  # (180, 128)
-            return lyrics_embeddings
+                # mean pooling -> (1, 768)
+                lyrics_mean = lyrics_embeddings.mean(dim=0, keepdim=True)
+
+                # repeat to (180, 768)
+                lyrics_seq = lyrics_mean.expand(SEQUENCE_LENGTH * FPS, -1).contiguous()
+            return lyrics_seq.float()
         except Exception as e:
             print(f"Error loading lyrics: {e}")
             return None
@@ -241,7 +237,7 @@ class Songs2022Dataset(Dataset):
     """
     Songs_2022 ディレクトリから motion, lyrics, audio を読み込む。
     """
-    def __init__(self, songs_dir=None, max_songs=3):
+    def __init__(self, songs_dir=None, max_songs=3, max_samples=None, max_timestamps_per_song=None):
         # 修正: 実際のプロジェクトルートに合わせる
         if songs_dir is None:
             repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -250,14 +246,15 @@ class Songs2022Dataset(Dataset):
         self.songs_dir = songs_dir
         all_songs = sorted([d for d in os.listdir(songs_dir) if os.path.isdir(os.path.join(songs_dir, d))])
         self.songs = all_songs[:max_songs] if max_songs else all_songs  # max_songs=None で全部
+
+        # 追加: スモークテスト/デバッグ用のロード上限
+        self.max_samples = max_samples
+        self.max_timestamps_per_song = max_timestamps_per_song
         
         # BERT tokenizer and model for lyrics embedding
         self.tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         self.bert_model = BertModel.from_pretrained('bert-base-uncased')
         self.bert_model.eval()
-        
-        # Lyrics embedding projection（インスタンス変数として固定）
-        self.lyrics_projection = nn.Linear(768, 128)
         
         self.data = []
         self._load_data()
@@ -288,6 +285,10 @@ class Songs2022Dataset(Dataset):
             
             start_sec = to_seconds(list(sliced.keys())[0])
             timestamps = list(sliced.keys())[:-1]
+
+            # 追加: 1曲あたりのタイムスタンプ上限（BERT計算が重いので）
+            if self.max_timestamps_per_song is not None:
+                timestamps = timestamps[: int(self.max_timestamps_per_song)]
             
             for timestamp in timestamps:
                 timestamp_sec = to_seconds(timestamp)
@@ -320,6 +321,10 @@ class Songs2022Dataset(Dataset):
                     'song': song_name,
                     'timestamp': tag
                 })
+
+                # 追加: サンプル総数の上限
+                if self.max_samples is not None and len(self.data) >= int(self.max_samples):
+                    return
     
     def _load_dance(self, full_dance, timestamp):
         """SMPL データをロード (FPS=30, SEQUENCE_LENGTH=6秒) - 正規化付き"""
@@ -389,9 +394,8 @@ class Songs2022Dataset(Dataset):
             # Mel-spectrogram 抽出
             mel_spec = librosa.feature.melspectrogram(y=audio, sr=SR, hop_length=601, n_mels=128)
             mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
-            mel_spec_db_norm = (mel_spec_db - np.mean(mel_spec_db)) / (np.std(mel_spec_db) + 1e-8)
             
-            audio_features = torch.from_numpy(mel_spec_db_norm.T).float()
+            audio_features = torch.from_numpy(mel_spec_db.T).float()
             
             # **固定長にリサンプル (SEQUENCE_LENGTH * FPS = 180)**
             target_length = SEQUENCE_LENGTH * FPS
@@ -428,10 +432,8 @@ class Songs2022Dataset(Dataset):
                 
                 # フレーム数に合わせて拡張
                 lyrics_embeddings = lyrics_mean.expand(SEQUENCE_LENGTH * FPS, -1)  # (180, 768)
-                
-                # 128 次元に削減
-                lyrics_embeddings = self.lyrics_projection(lyrics_embeddings).detach()  # (180, 128)
-            return lyrics_embeddings
+
+            return lyrics_embeddings.float()
         except Exception as e:
             print(f"Error loading lyrics: {e}")
             return None
@@ -450,9 +452,13 @@ class Songs2022Dataset(Dataset):
         }
 
 
-def get_2022_dataloader(batch_size=1, max_songs=3):
+def get_2022_dataloader(batch_size=1, max_songs=3, max_samples=None, max_timestamps_per_song=None):
     """Songs_2022 用 DataLoader を生成"""
-    dataset = Songs2022Dataset(max_songs=max_songs)
+    dataset = Songs2022Dataset(
+        max_songs=max_songs,
+        max_samples=max_samples,
+        max_timestamps_per_song=max_timestamps_per_song,
+    )
     print(f"Loaded {len(dataset)} sequences from Songs_2022 ({dataset.songs[:max_songs]})")
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
     return loader
@@ -487,7 +493,7 @@ def get_multiseason_dataloader(batch_size=4, years=['2020', '2021', '2022']):
     )
 
 
-def get_season_dataloader(batch_size=4, year='2022', max_songs=None):
+def get_season_dataloader(batch_size=4, year='2022', max_songs=None, max_samples=None, max_timestamps_per_song=None):
     """
     特定シーズン (Songs_YYYY) のデータローダーを返す。
     """
@@ -497,7 +503,12 @@ def get_season_dataloader(batch_size=4, year='2022', max_songs=None):
     if not os.path.exists(songs_dir):
         raise FileNotFoundError(f"Songs_{year} directory not found at: {songs_dir}")
     
-    dataset = Songs2022Dataset(songs_dir=songs_dir, max_songs=max_songs)
+    dataset = Songs2022Dataset(
+        songs_dir=songs_dir,
+        max_songs=max_songs,
+        max_samples=max_samples,
+        max_timestamps_per_song=max_timestamps_per_song,
+    )
     
     return DataLoader(
         dataset.data,

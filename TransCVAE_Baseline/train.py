@@ -38,30 +38,25 @@ def train(epochs=10, use_multiseason=True, year='2022'):
     for epoch in range(epochs):
         for step, batch in enumerate(loader):
             # 辞書から取り出し
-            motion = batch['motion'].to(device)  # (batch, 180, motion_dim)
-            lyrics = batch['lyrics'].to(device)  # (batch, 180, 128)
-            audio = batch['audio'].to(device)    # (batch, time_steps, 128)
-            
-            # オーディオを同じ長さにパディング/カット (例: 180 フレーム = 6秒@30fps)
-            target_len = 180
-            if audio.shape[1] < target_len:
-                pad = target_len - audio.shape[1]
-                audio = F.pad(audio, (0, 0, 0, pad))
-            else:
-                audio = audio[:, :target_len, :]
-            
-            # フレームごとに flatten
-            batch_size = motion.size(0)
-            motion_flat = motion.view(batch_size * 180, -1)
-            lyrics_flat = lyrics.view(batch_size * 180, -1)
-            audio_flat = audio.view(batch_size * 180, -1)
-            
-            # Forward pass
-            recon, mu, logvar = model(audio_flat, motion_flat, lyrics_flat)
-            loss_recon = recon_loss_l1(recon, audio_flat)
-            loss_kld = kld_loss(mu, logvar)
-            loss = loss_recon + CONFIG["kld_weight"] * loss_kld
+            motion = batch["motion"].to(device)   # (B, T, motion_dim)
+            lyrics = batch["lyrics"].to(device)   # (B, T, lyrics_dim)
+            audio  = batch["audio"].to(device)    # (B, T, audio_dim)
 
+            seq_len = CONFIG.get("seq_len", 180)
+
+            # 念のため長さを揃える（padding/trim）
+            if audio.size(1) < seq_len:
+                audio = torch.nn.functional.pad(audio, (0,0,0, seq_len-audio.size(1)))
+            else:
+                audio = audio[:, :seq_len, :]
+
+            motion = motion[:, :seq_len, :]
+            lyrics = lyrics[:, :seq_len, :]
+
+            recon, mu, logvar = model(audio, motion, lyrics)     # recon: (B, T, audio_dim) にする（次の修正）
+            loss_recon = recon_loss_l1(recon, audio)
+            loss_kld   = kld_loss(mu, logvar)
+            loss       = loss_recon + CONFIG["kld_weight"] * loss_kld
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

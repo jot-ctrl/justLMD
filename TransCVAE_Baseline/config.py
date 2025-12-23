@@ -1,7 +1,7 @@
 CONFIG = {
     "audio_dim": 128,         # mel-spectrogram 次元
     "motion_dim": 78,         # SMPL motion 次元（poses(72) + Th(3) + Rh(3) = 78）
-    "lyrics_dim": 128,        # 投影後の歌詞埋め込み次元
+    "lyrics_dim": 768,        # 投影後の歌詞埋め込み次元
     
     # Transformer パラメータ
     "d_model": 256,           # Transformer の内部次元
